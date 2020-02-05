@@ -23,6 +23,10 @@ NYC dataset is in "nyc_data".
 
 Each folder has four files, storing the potential edges, existing edges, node location, and a random matrix for connectivity computation.
 
+*** We also share the dataset that are not needed for running, but used to generate the above dataset.
+
+Trajectory dataset can be downloaded here: https://drive.google.com/open?id=1NFUH-YHOXDoSAYZqJPwVkJK8E-H56TIw
+
 ## Results
 After running successfully, our code will generate two files: "chi_busroutes_new.m" is ids of stops, and another one "chi_route_stops" generate a set of locations.
 
