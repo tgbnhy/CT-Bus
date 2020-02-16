@@ -2,15 +2,15 @@
 This repo holds the code and dataset for reproducibility of EquaBus.
 
 ## Running
-1. Function test
+1. Function test: we can run a specific configuration on NYC, with k=15, sn=5000, Tn=1, and w=0.5.
 
 ./fairbus_run.m
 
-2. Sumdularity test
+2. Sumdularity test: we can reproduce Figure 2.
 
 ./test_submodular.m
 
-3. Sensibility test
+3. Sensibility test: We can reproduce Figure 6 and 8.
 
 ./experiments.m
 
@@ -28,7 +28,7 @@ Each folder has four files, storing the potential edges, existing edges, node lo
 Trajectory dataset can be downloaded here: https://drive.google.com/open?id=1NFUH-YHOXDoSAYZqJPwVkJK8E-H56TIw
 
 ## Results
-After running successfully, our code will generate two files: "chi_busroutes_new.m" is ids of stops, and another one "chi_route_stops" generate a set of locations.
+After running successfully, our code will generate two files: "chi_busroutes_new.txt" is ids of stops, and another one "chi_route_stops.txt" generate a set of locations.
 
 ## Visualization
 
