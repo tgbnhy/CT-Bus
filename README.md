@@ -1,4 +1,4 @@
-# EquaBus-code
+# Route Planning for Robust Transit Planning
 This repo holds the code and dataset for the reproducibility of EquaBus.
 
 ## Running
