@@ -1,4 +1,4 @@
-# Route Planning for Robust Transit Planning
+# Public Transport Route Planning: When Connectivity and Commuting Demand Both Matter
 This repo holds the code and dataset for the reproducibility of EquaBus.
 
 ## Running
