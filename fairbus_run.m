@@ -1,27 +1,27 @@
 %%%%%% parameters
 
-weight = 0.5; % the weight to balance each dimension
+weight = 0.5; % the weight to balance each dimension, when we set it as 1, it is a baseline using orienteering
 k = 30; % number of new edges in a path
 number_of_turns = 1;% number of turns, candidates
 seeding_number = 5000;% number of candidate edges as initial paths, 174579 for nyc, 101774, and inserting all neighbors
 
 max_len = k; % maximum number of edges in a path
 max_iter = 100000;
-area_lable = 4;% 1: Brooklyn, 2: Manhattan, 3: Statan, 4: Queens, 5 Bronx
+area_lable = 5;% 1: Brooklyn, 2: Manhattan, 3: Statan, 4: Queens, 5 Bronx
 area_indicator = 1;% only for NYC dataset
 
-city_choice = 0; % 0:1;% test two cities, nyc (1) or chicago (0)
-computation_choice = 0;%full bound computation or fast easy bound
+city_choice = 1; % 0:1;% test two cities, nyc (1) or chicago (0)
+computation_choice = 0;%full bound computation or fast easy bound, fast (0) or slow (1)
 
 objectives = [];%for logs
 
 for test_nyc = city_choice
     optimization_choice = 0;%0:2; %0 for full optimization, 1 for all neighbors, 2 for not use domination table
     %% import the graph and dataset.
-    stoplocations = load('./nyc_data/nyc_transit_stop_locations.mat');
-    neighor_stops = load('./nyc_data/new_nyc_transit_neighbors0.5_0.2_pre.mat');
-    K1_origin = load('./nyc_data/new_nyc_random_K1.mat');%for conn, randomly in the begining, use a fixed one
-    C = load('./nyc_data/nyc_transit_weighted.mat');
+    stoplocations = load('/Users/sw160/Desktop/nyc/nyc_transit_stop_locations.mat');
+    neighor_stops = load('/Users/sw160/Desktop/nyc/new_nyc_transit_neighbors0.5_0.2_pre.mat');
+    K1_origin = load('/Users/sw160/Desktop/nyc/new_nyc_random_K1.mat');%for conn, randomly in the begining, use a fixed one
+    C = load('/Users/sw160/Desktop/nyc/nyc_transit_weighted.mat');
     nodes_Number = 12340;
 
     if ~test_nyc
@@ -29,7 +29,7 @@ for test_nyc = city_choice
         stoplocations = load('/Users/sw160/Desktop/transit_network/chicago/chi_transit_stop_locations.mat');
         neighor_stops = load('/Users/sw160/Desktop/transit_network/chicago/chi_transit_neighbors0.5_0.2.mat');
         K1_origin = load('/Users/sw160/Desktop/transit_network/chicago/new_chi_random_K1.mat');%for conn, randomly in the begining, use a fixed one
-        C = load('/Users/sw160/Desktop/transit_network/chicago/chi_transit_weighted.mat');
+        C = load('/Users/sw160/Desktop/transit_network/chicago/chi_transit_weighted.mat');% this is the existing edges
     end
 
     stoplocations = stoplocations.arr;%it stores the location information of stops
@@ -81,7 +81,13 @@ for test_nyc = city_choice
     graph_dimension = size(A,1);
     %[SortC,idxC] = sort(C(:,6),'descend');%sort existing edges by the edge frequency
 
-    D = [B;C];%combine possible edges and new edges, 
+    if weight == 1
+        D = B; % only consider the new edges
+        G = graph();% empty the graph
+    else
+        D = [B;C];%combine possible edges and new edges, 
+    end
+    % tranfer the weight of edges to vertex.
     
     %% parameters and data structures for connectivity
     reps = 50;% number of random vectors
@@ -174,15 +180,25 @@ for test_nyc = city_choice
             lb = 1;%the initial bound
             checked_edges = containers.Map;% for domination on candidates have same ends
             seeding_edges = containers.Map;
-            for i=1:seeding_number
+            counter = 0;
+            for i=1:size(B,1)
                 ix = idxA(i);
                 newpath = [D(ix,1) D(ix,2)];
+                
+                if area_indicator % plan for an area
+                    if or(area_lable ~= stoplocations(D(ix,1),4), area_lable~= stoplocations(D(ix,2),4))
+                        continue;
+                    end
+                end
+                
                 if or(D(ix,1)>nodes_Number, D(ix,2)>nodes_Number) %for new york dataset
                     continue;
                 end
+                
                 if or(isKey(seeding_edges, D(ix,1)+","+D(ix,2)), isKey(seeding_edges, D(ix,2)+","+D(ix,1)))%avoid repetitive
                     continue
                 end
+                
                 seeding_edges(D(ix,1)+","+D(ix,2)) = 1;
                 seeding_edges(D(ix,2)+","+D(ix,1)) = 1;
                % disp(newpath);
@@ -193,33 +209,41 @@ for test_nyc = city_choice
                     lb = 1 - (bottom_weight-D(ix,8));
                 end
                 [frequency, conn, new_equity] = equity(A, newpath, graph_dimension, weight, connectivity_ub, lb_weight_max, K1, reps, iter, 0, D(ix,6),0, D(ix,7),0,base);
+                
                 if new_equity > min_equity
                     min_equity = new_equity;
                     best_path = newpath;
-                end     
-                if area_indicator % plan for an area
-                    if or(area_lable ~= stoplocations(D(ix,1),4), area_lable~= stoplocations(D(ix,2),4))
-                        continue;
-                    end
+                    best_array = [lb*-1 bw 0 frequency conn D(ix,1) D(ix,2)];
+                %    best_array(4) = newfre;
+                %    best_array(5) = newconn;
                 end
+                
+                                
                 q.insert([lb*-1 bw 0 frequency conn D(ix,1) D(ix,2)]);%how to indicate new edges for later update, and the last two edges
+                counter = counter+1;
+                if counter>seeding_number
+                    break
+                end
             end
 
             bad = 0;
             tic
+            disp("hello")
             while n < max_iter && q.size()>0 % the queue is not empty
                 candidate = q.remove();
                 lower_bound = candidate(1)*-1;% the potential
+                
                 if min_equity > lower_bound% current result already smaller than the rest potential
                     break
                 end
+                
                 size_path = size(candidate);
                 bw = candidate(2); % cursor for upper bound
                 bc = candidate(3); % record number of turns
                 frequency = candidate(4);% current frequency (demand)
                 conn = candidate(5);% current conn
                 path = candidate(6:size_path(2));%the path, new bound
-            %    disp(n+" "+min_equity+" " + lower_bound+ " " +length(best_path)+" "+q.size()); %the lower bound 
+                disp(n+" "+min_equity+" " + lower_bound+ " " +length(best_path)+" "+q.size()); %the lower bound 
                 if mod(n,100) == 0
                     cc = n/100;
                     if test_nyc==0 && full_computation == 1
@@ -233,10 +257,12 @@ for test_nyc = city_choice
                 end
                 last_node = candidate(size_path(2));
                 first_node = candidate(6);
-                N = transpose(neighbors(G,last_node));%get existing neighbor in the graph
                 ne = [];
-                for i=1:length(N)
-                    ne = [ne, size(B) + G.Edges.Weight(findedge(G,last_node,N(i)))];%locate the edge
+                if weight < 1
+                    N = transpose(neighbors(G,last_node));%get existing neighbor in the graph
+                    for i=1:length(N)
+                        ne = [ne, size(B) + G.Edges.Weight(findedge(G,last_node,N(i)))];%locate the edge
+                    end
                 end
                 TF = isKey(neighbors_node, int2str(last_node));
                 if TF==1%access the linked possible, 
@@ -244,6 +270,7 @@ for test_nyc = city_choice
                         ne = [ne, neighbors_node(int2str(last_node))+i];%add new the neighbor lists
                     end
                 end
+             %   disp(ne)% show 
                 max_increment = 0;
                 best_xx = 0;
                 array = [];
@@ -251,7 +278,11 @@ for test_nyc = city_choice
                 best_neighbor = 0;
                 for i = 1: length(ne)% check all the neighbors, choose the one with maximum increment
                     index_neighbor = ne(i);
+                    if index_neighbor >= size(D,1)
+                        continue;
+                    end
                     xx = D(index_neighbor, 2);
+                    
                     if D(index_neighbor, 2) == last_node %avoid the edge from graph
                         xx = D(index_neighbor, 1);
                     end
@@ -278,11 +309,12 @@ for test_nyc = city_choice
                     if new_bc > number_of_turns
                         continue
                     end
-
+ 
                     % optional
                     newpath = [path, xx];% add to the last end
                     K1 =  K1_origin.K1;%
                     [newfre, newconn, new_equity] = equity(A, newpath, graph_dimension, weight, connectivity_ub, lb_weight_max, K1, reps, iter, frequency, D(index_neighbor,6),conn, D(index_neighbor, 7), full_computation,base);
+              %      disp(new_equity)
                     % domination table
                     %{
                     if xx < first_node
@@ -342,10 +374,12 @@ for test_nyc = city_choice
                 if bw<1 % no more edges to be added, as it aready has k edges
                     continue
                 end
-                N = transpose(neighbors(G,first_node));%get existing neighbors in the graph
                 ne = [];
-                for i=1:length(N)
-                    ne = [ne, size(B)+G.Edges.Weight(findedge(G,first_node,N(i)))];%locate the edge in D
+                if weight < 1
+                    N = transpose(neighbors(G,first_node));%get existing neighbors in the graph
+                    for i=1:length(N)
+                        ne = [ne, size(B)+G.Edges.Weight(findedge(G,first_node,N(i)))];%locate the edge in D
+                    end
                 end
                 TF = isKey(neighbors_node, int2str(first_node));
                 if TF==1%access the linked possible, 
@@ -358,6 +392,9 @@ for test_nyc = city_choice
                 array = [];
                 for i = 1: length(ne)
                     index_neighbor = ne(i);
+                    if index_neighbor >= size(D,1)
+                        continue;
+                    end
                     xx = D(index_neighbor, 2);
                     if D(index_neighbor, 2) == last_node %avoid the edge from graph
                         xx = D(index_neighbor, 1);
@@ -382,6 +419,7 @@ for test_nyc = city_choice
                     if new_bc > number_of_turns
                         continue
                     end
+                    
 
                     newpath = [xx, path];%add to the start position
                     K1 =  K1_origin.K1;%
@@ -484,14 +522,14 @@ for test_nyc = city_choice
             disp("estimated increase demand: "+best_array(4));
             disp("estimated time on conn and ub: "+ estimted_running_time);
             %write file for mapv visualization
-            fileID = fopen('./logs/nyc_fairbus_k501.txt','w');
-            fileID3 = fopen('./logs/nyc_route_stops.txt','w');
-            fileID2 = fopen('./logs/nyc_busroutes_new.txt','w');
+            fileID = fopen('/Users/sw160/Documents/mapv-2.0.12/travis/data/fairbus_k501.txt','w');
+            fileID3 = fopen('/Users/sw160/Desktop/nyc/route_stops.txt','w');
+            fileID2 = fopen('/Users/sw160/Desktop/nyc/busroutes_new.txt','w');
 
             if ~test_nyc
-                fileID = fopen('./logs/chi_fairbus_k501.txt','w');
-                fileID3 = fopen('./logs/chi_route_stops.txt','w');
-                fileID2 = fopen('./logs/chi_busroutes_new.txt','w');
+                fileID = fopen('/Users/sw160/Documents/mapv-2.0.12/travis/data/chi_fairbus_k501.txt','w');
+                fileID3 = fopen('/Users/sw160/Desktop/transit_network/chicago/route_stops.txt','w');
+                fileID2 = fopen('/Users/sw160/Desktop/transit_network/chicago/busroutes_new.txt','w');
             end
 
 
@@ -505,6 +543,7 @@ for test_nyc = city_choice
                     fprintf(fileID,',');
                 end
             end
+            %write the stops location, and new edges,
             fprintf(fileID,']}"\n');% \n is essential, it will not work if without it.
             fclose(fileID);
             fclose(fileID2);
@@ -515,7 +554,7 @@ for test_nyc = city_choice
 end
 toc
 
-logs = "./logs/exp_logs";%give every d
+logs = "/Users/sw160/Desktop/nyc/exp_logs";%give every d
 %{
 if test_nyc
     if area_indicator
