@@ -1,5 +1,5 @@
 # Public Transport Route Planning: When Connectivity and Commuting Demand Both Matter
-This repo holds the code and dataset for the reproducibility of EquaBus.
+This repo holds the code and dataset for the reproducibility of CT-Bus.
 
 ## Running
 1. Function test: we can run a specific configuration on NYC, with k=15, sn=5000, Tn=1, and w=0.5.
